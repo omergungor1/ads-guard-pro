@@ -1,9 +1,10 @@
 // app/api/domains/route.js
-// Domain yönetimi - Liste ve Ekleme
+// Domain Yönetimi - Yeni Yapı
 
 import { NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
 import { supabaseAdmin, getServerSession } from '@/lib/supabase-client';
+import { GoogleAdsClientOfficial } from '@/lib/google-ads-client-official';
 
 // Domain listesini getir
 export async function GET(request) {
@@ -18,10 +19,9 @@ export async function GET(request) {
         const { data: domains, error } = await supabaseAdmin
             .from('domains')
             .select(`
-        *,
-        domain_rules(*),
-        ads_campaigns(count)
-      `)
+                *,
+                ads_campaigns(count)
+            `)
             .eq('profile_id', user.id)
             .order('created_at', { ascending: false });
 
@@ -54,6 +54,10 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Domain gerekli' }, { status: 400 });
         }
 
+        if (!ads_account_id) {
+            return NextResponse.json({ error: 'Google Ads hesap ID gerekli' }, { status: 400 });
+        }
+
         // Kullanıcının profil bilgisini al
         const { data: profile } = await supabaseAdmin
             .from('profiles')
@@ -74,7 +78,7 @@ export async function POST(request) {
             );
         }
 
-        // Unique tracking ID oluştur
+        // Unique tracking ID oluştur (16 karakter)
         const trackingId = nanoid(16);
 
         // Domain ekle
@@ -84,7 +88,7 @@ export async function POST(request) {
                 profile_id: user.id,
                 domain: domain,
                 tracking_id: trackingId,
-                ads_account_id: ads_account_id || null,
+                ads_account_id: ads_account_id,
                 timezone: timezone || 'UTC',
                 is_active: true
             })
@@ -96,30 +100,68 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Domain eklenemedi' }, { status: 500 });
         }
 
-        // Varsayılan domain rule ekle
-        const { error: ruleError } = await supabaseAdmin
-            .from('domain_rules')
-            .insert({
-                domain_id: newDomain.id,
-                max_clicks: 3,
-                time_window_days: 15,
-                blocking_mode: 'moderate',
-                auto_block_enabled: true,
-                block_vpn: true,
-                block_proxy: true,
-                block_hosting: true,
-                block_tor: true
-            });
+        console.log('✅ Domain eklendi:', newDomain.domain, 'Tracking ID:', trackingId);
 
-        if (ruleError) {
-            console.error('Domain rule ekleme hatası:', ruleError);
+        // ═══════════════════════════════════════════════════════════
+        // Google Ads API ile Kampanyaları Çek
+        // ═══════════════════════════════════════════════════════════
+        try {
+            // Google Ads hesap bilgilerini al
+            const { data: adsAccount } = await supabaseAdmin
+                .from('google_oauth_tokens')
+                .select('*')
+                .eq('is_active', true)
+                .single();
+
+            if (adsAccount) {
+                const googleAdsClient = new GoogleAdsClientOfficial(
+                    adsAccount.access_token,
+                    adsAccount.refresh_token,
+                    adsAccount.mcc_customer_id
+                );
+
+                console.log('📡 Kampanyalar Google Ads API\'den çekiliyor...');
+
+                // Kampanyaları çek
+                const campaigns = await googleAdsClient.getCampaigns(ads_account_id);
+
+                console.log(`✅ ${campaigns.length} kampanya bulundu`);
+
+                // Kampanyaları veritabanına kaydet
+                if (campaigns.length > 0) {
+                    const campaignInserts = campaigns.map(campaign => ({
+                        domain_id: newDomain.id,
+                        campaign_id: campaign.id,
+                        campaign_name: campaign.name,
+                        added_method: 'manual', // İlk çekimde manual
+                        is_active: campaign.status === 'ENABLED'
+                    }));
+
+                    const { error: campaignError } = await supabaseAdmin
+                        .from('ads_campaigns')
+                        .insert(campaignInserts);
+
+                    if (campaignError) {
+                        console.error('Kampanya kaydetme hatası:', campaignError);
+                    } else {
+                        console.log(`✅ ${campaigns.length} kampanya kaydedildi`);
+                    }
+                }
+            } else {
+                console.warn('⚠️ Google Ads hesabı bulunamadı, kampanyalar çekilemedi');
+            }
+        } catch (error) {
+            console.error('❌ Kampanya çekme hatası:', error);
+            // Domain eklendi ama kampanyalar çekilemedi, hata vermeden devam et
         }
 
-        console.log('✅ Domain eklendi:', newDomain.domain, trackingId);
+        // Tracking URL'i oluştur
+        const trackingUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://yourdomain.com'}/api/tracker?id=${trackingId}&campaign_id={campaignid}&gclid={gclid}&keyword={keyword}&device={device}&network={network}&adpos={adposition}&placement={placement}&url={lpurl}`;
 
         return NextResponse.json({
             success: true,
-            domain: newDomain
+            domain: newDomain,
+            tracking_url: trackingUrl
         });
 
     } catch (error) {
@@ -127,4 +169,3 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Bir hata oluştu' }, { status: 500 });
     }
 }
-

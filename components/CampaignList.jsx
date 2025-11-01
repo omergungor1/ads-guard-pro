@@ -1,8 +1,9 @@
 // components/CampaignList.jsx
 'use client';
 
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import IpBlockForm from './IpBlockForm';
+import IpRemovalModal from './IpRemovalModal';
 import Toast from './Toast';
 
 export default function CampaignList({ customerId }) {
@@ -12,6 +13,10 @@ export default function CampaignList({ customerId }) {
     const [selectedCampaign, setSelectedCampaign] = useState(null);
     const [showIpForm, setShowIpForm] = useState(false);
     const [toast, setToast] = useState(null);
+    const [blockedIps, setBlockedIps] = useState({});
+    const [loadingIps, setLoadingIps] = useState({});
+    const [showRemoveIpForm, setShowRemoveIpForm] = useState(false);
+    const [selectedCampaignForRemoval, setSelectedCampaignForRemoval] = useState(null);
 
     const fetchCampaigns = async () => {
         if (!customerId) {
@@ -86,6 +91,101 @@ export default function CampaignList({ customerId }) {
         setSelectedCampaign(null);
     };
 
+    const fetchBlockedIps = async (campaignId) => {
+        setLoadingIps(prev => ({ ...prev, [campaignId]: true }));
+
+        try {
+            const response = await fetch(
+                `/api/campaigns/blocked-ips?customer_id=${customerId}&campaign_id=${campaignId}`
+            );
+            const data = await response.json();
+
+            if (data.success) {
+                setBlockedIps(prev => ({ ...prev, [campaignId]: data.ips }));
+                setToast({
+                    type: 'success',
+                    message: `${data.ips.length} engellenmiş IP bulundu`,
+                });
+            } else {
+                throw new Error(data.error || 'IP\'ler alınamadı');
+            }
+        } catch (err) {
+            setToast({
+                type: 'error',
+                message: err.message,
+            });
+        } finally {
+            setLoadingIps(prev => ({ ...prev, [campaignId]: false }));
+        }
+    };
+
+    const toggleIpList = (campaignId) => {
+        if (blockedIps[campaignId]) {
+            // Zaten yüklüyse kapat
+            setBlockedIps(prev => {
+                const newState = { ...prev };
+                delete newState[campaignId];
+                return newState;
+            });
+        } else {
+            // Yüklenmemişse API'den al
+            fetchBlockedIps(campaignId);
+        }
+    };
+
+    const openRemoveIpForm = async (campaign) => {
+        setSelectedCampaignForRemoval(campaign);
+        // IP'leri yükle
+        if (!blockedIps[campaign.id]) {
+            await fetchBlockedIps(campaign.id);
+        }
+        setShowRemoveIpForm(true);
+    };
+
+    const closeRemoveIpForm = () => {
+        setShowRemoveIpForm(false);
+        setSelectedCampaignForRemoval(null);
+    };
+
+    const handleRemoveIps = async (ipAddresses) => {
+        if (!selectedCampaignForRemoval) return;
+
+        try {
+            const response = await fetch('/api/campaigns/remove-ip', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    customer_id: customerId,
+                    campaign_id: selectedCampaignForRemoval.id,
+                    ip_addresses: ipAddresses,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setToast({
+                    type: 'success',
+                    message: `${data.data.removedCount} IP adresi başarıyla kaldırıldı!`,
+                });
+                // IP listesini yenile
+                await fetchBlockedIps(selectedCampaignForRemoval.id);
+                setShowRemoveIpForm(false);
+                setSelectedCampaignForRemoval(null);
+            } else {
+                throw new Error(data.error || 'IP kaldırma başarısız');
+            }
+        } catch (err) {
+            setToast({
+                type: 'error',
+                message: err.message,
+            });
+            throw err;
+        }
+    };
+
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -141,35 +241,86 @@ export default function CampaignList({ customerId }) {
                             </thead>
                             <tbody className="divide-y divide-gray-200">
                                 {campaigns.map((campaign, index) => (
-                                    <tr key={index} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                                            {campaign.name}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-gray-500 font-mono">
-                                            {campaign.id}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm">
-                                            <span
-                                                className={`px-2 py-1 rounded-full text-xs font-medium ${campaign.status === 2
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : 'bg-yellow-100 text-yellow-800'
-                                                    }`}
-                                            >
-                                                {campaign.status === 2 ? 'Aktif' : 'Pasif'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-gray-500">
-                                            {campaign.type == 2 ? 'Search' : campaign.type}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm">
-                                            <button
-                                                onClick={() => openIpForm(campaign)}
-                                                className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
-                                            >
-                                                🚫 IP Engelle
-                                            </button>
-                                        </td>
-                                    </tr>
+                                    <Fragment key={index}>
+                                        <tr className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                                                {campaign.name}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-500 font-mono">
+                                                {campaign.id}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm">
+                                                <span
+                                                    className={`px-2 py-1 rounded-full text-xs font-medium ${campaign.status === 2
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : 'bg-yellow-100 text-yellow-800'
+                                                        }`}
+                                                >
+                                                    {campaign.status === 2 ? 'Aktif' : 'Pasif'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-500">
+                                                {campaign.type == 2 ? 'Search' : campaign.type}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm">
+                                                <div className="flex gap-2 flex-wrap">
+                                                    <button
+                                                        onClick={() => openIpForm(campaign)}
+                                                        className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
+                                                    >
+                                                        🚫 IP Engelle
+                                                    </button>
+                                                    <button
+                                                        onClick={() => openRemoveIpForm(campaign)}
+                                                        className="px-3 py-1 bg-orange-600 text-white text-xs rounded hover:bg-orange-700 transition-colors"
+                                                    >
+                                                        🗑️ IP Kaldır
+                                                    </button>
+                                                    <button
+                                                        onClick={() => toggleIpList(campaign.id)}
+                                                        disabled={loadingIps[campaign.id]}
+                                                        className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors disabled:bg-gray-400"
+                                                    >
+                                                        {loadingIps[campaign.id] ? (
+                                                            '⏳'
+                                                        ) : blockedIps[campaign.id] ? (
+                                                            '🔼 Gizle'
+                                                        ) : (
+                                                            '📋 Engellenmiş IP\'ler'
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {/* Engellenmiş IP'leri göster */}
+                                        {blockedIps[campaign.id] && (
+                                            <tr>
+                                                <td colSpan="5" className="px-6 py-4 bg-gray-50">
+                                                    <div className="border-l-4 border-blue-500 pl-4">
+                                                        <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                                                            Engellenmiş IP Adresleri ({blockedIps[campaign.id].length})
+                                                        </h4>
+                                                        {blockedIps[campaign.id].length > 0 ? (
+                                                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                                                                {blockedIps[campaign.id].map((ip, ipIndex) => (
+                                                                    <div
+                                                                        key={ipIndex}
+                                                                        className="px-3 py-2 bg-white border border-gray-300 rounded text-xs font-mono text-gray-700"
+                                                                    >
+                                                                        🚫 {ip.ipAddress}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-sm text-gray-500 italic">
+                                                                Bu kampanyada henüz engellenmiş IP yok
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </Fragment>
                                 ))}
                             </tbody>
                         </table>
@@ -198,7 +349,6 @@ export default function CampaignList({ customerId }) {
                             </button>
                         </div>
                         <div className="p-6">
-                            hello there...
                             <IpBlockForm
                                 mode="single"
                                 campaignId={selectedCampaign.id}
@@ -208,6 +358,16 @@ export default function CampaignList({ customerId }) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* IP Kaldırma Modal */}
+            {showRemoveIpForm && selectedCampaignForRemoval && (
+                <IpRemovalModal
+                    campaign={selectedCampaignForRemoval}
+                    blockedIps={blockedIps[selectedCampaignForRemoval.id] || []}
+                    onClose={closeRemoveIpForm}
+                    onRemove={handleRemoveIps}
+                />
             )}
 
             {/* Toast Notification */}

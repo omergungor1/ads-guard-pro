@@ -1,5 +1,6 @@
 // public/js/tracker.js
-// AdsGuardPro On-Site Tracking Script
+// AdsGuardsPro On-Site Tracking Script - Yeni Yapı
+// Tüm ziyaretçileri izler (ads/organik/direkt)
 
 (function () {
     'use strict';
@@ -14,7 +15,7 @@
     // Debug log
     function log(...args) {
         if (CONFIG.debug) {
-            console.log('[AGP Tracker]', ...args);
+            console.log('[AdsGuardsPro]', ...args);
         }
     }
 
@@ -28,77 +29,11 @@
 
     // Session ID localStorage'da sakla
     function getSessionId() {
-        return localStorage.getItem('agp_session_id');
+        return sessionStorage.getItem('agp_session_id');
     }
 
     function setSessionId(sessionId) {
-        localStorage.setItem('agp_session_id', sessionId);
-    }
-
-    // Ana tracking fonksiyonu
-    async function initTracking() {
-        try {
-            // Cookie'lerden click_id ve tracking_id al
-            const clickId = getCookie('agp_click_id');
-            const trackingId = getCookie('agp_tracking_id') || CONFIG.trackingId;
-
-            if (!trackingId) {
-                log('Tracking ID bulunamadı, tracking atlanıyor');
-                return;
-            }
-
-            log('Tracking başlatılıyor...', { clickId, trackingId });
-
-            // FingerprintJS yükle ve fingerprint oluştur
-            const FingerprintJS = await loadFingerprintJS();
-            const fp = await FingerprintJS.load();
-            const result = await fp.get();
-            const fingerprintId = result.visitorId;
-
-            log('Fingerprint ID:', fingerprintId);
-
-            // Session başlat
-            const response = await fetch(`${CONFIG.apiUrl}/api/track/init`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    click_id: clickId,
-                    tracking_id: trackingId,
-                    fingerprint_id: fingerprintId,
-                    screen_width: window.screen.width,
-                    screen_height: window.screen.height,
-                    device_pixel_ratio: window.devicePixelRatio,
-                    landing_page: window.location.href,
-                    referrer: document.referrer,
-                    user_agent: navigator.userAgent,
-                    components: result.components
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                const sessionId = data.session_id;
-                setSessionId(sessionId);
-
-                log('Session oluşturuldu:', sessionId, 'Ad Traffic:', data.is_ad_traffic);
-
-                // Event tracking'i başlat
-                startEventTracking(sessionId);
-
-                // İlk page view event'ini kaydet
-                trackEvent(sessionId, 'page_view', {
-                    page_url: window.location.href
-                });
-            } else {
-                log('Session oluşturulamadı:', data.error);
-            }
-
-        } catch (error) {
-            log('Tracking hatası:', error);
-        }
+        sessionStorage.setItem('agp_session_id', sessionId);
     }
 
     // FingerprintJS CDN'den yükle
@@ -119,7 +54,7 @@
     }
 
     // Event tracking
-    async function trackEvent(sessionId, eventType, eventData) {
+    async function trackEvent(sessionId, eventType, eventData = {}) {
         try {
             await fetch(`${CONFIG.apiUrl}/api/track/event`, {
                 method: 'POST',
@@ -139,9 +74,35 @@
         }
     }
 
+    // Heartbeat (30 saniyede bir)
+    function startHeartbeat(sessionId) {
+        const heartbeatInterval = setInterval(() => {
+            fetch(`${CONFIG.apiUrl}/api/track/heartbeat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ session_id: sessionId })
+            }).catch(err => {
+                log('Heartbeat hatası:', err);
+            });
+        }, 30000); // 30 saniye
+
+        // Cleanup
+        window.addEventListener('beforeunload', () => {
+            clearInterval(heartbeatInterval);
+        });
+
+        return heartbeatInterval;
+    }
+
     // Event listener'ları başlat
     function startEventTracking(sessionId) {
-        // Scroll tracking
+        log('Event tracking başlatılıyor...');
+
+        // ═══════════════════════════════════════════════════════════
+        // 1. Scroll Tracking
+        // ═══════════════════════════════════════════════════════════
         let lastScrollPercent = 0;
         let scrollTimeout;
 
@@ -152,9 +113,9 @@
                     (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100
                 );
 
-                // Her %10'da bir kaydet
-                if (scrollPercent > lastScrollPercent && scrollPercent % 10 === 0) {
-                    lastScrollPercent = scrollPercent;
+                // Her %25'te bir kaydet
+                if (scrollPercent >= lastScrollPercent + 25) {
+                    lastScrollPercent = Math.floor(scrollPercent / 25) * 25;
                     trackEvent(sessionId, 'scroll', {
                         scroll_px: window.scrollY,
                         scroll_percent: scrollPercent,
@@ -164,10 +125,17 @@
             }, 150);
         });
 
-        // Click tracking
+        // ═══════════════════════════════════════════════════════════
+        // 2. Click Tracking
+        // ═══════════════════════════════════════════════════════════
         document.addEventListener('click', (e) => {
             const target = e.target;
-            trackEvent(sessionId, 'click', {
+
+            // Call button kontrolü (örnek class'lar)
+            const isCallButton = target.matches('.call-btn, .ara-btn, .telefon-btn, [href^="tel:"]') ||
+                target.closest('.call-btn, .ara-btn, .telefon-btn, [href^="tel:"]');
+
+            trackEvent(sessionId, isCallButton ? 'call_button_click' : 'click', {
                 click_x: e.clientX,
                 click_y: e.clientY,
                 target_element: target.tagName,
@@ -177,42 +145,148 @@
             });
         });
 
-        // Visibility change tracking
+        // ═══════════════════════════════════════════════════════════
+        // 3. Form Submit Tracking
+        // ═══════════════════════════════════════════════════════════
+        document.addEventListener('submit', (e) => {
+            const form = e.target;
+            trackEvent(sessionId, 'form_submit', {
+                target_element: form.id || form.className,
+                event_data: {
+                    form_id: form.id,
+                    action: form.action
+                },
+                page_url: window.location.href
+            });
+        });
+
+        // ═══════════════════════════════════════════════════════════
+        // 4. Visibility Change Tracking
+        // ═══════════════════════════════════════════════════════════
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
-                trackEvent(sessionId, 'visibility_change', {
-                    visibility_percentage: 0,
-                    page_url: window.location.href
-                });
+                log('Sayfa gizlendi');
             } else {
-                trackEvent(sessionId, 'visibility_change', {
-                    visibility_percentage: 100,
-                    page_url: window.location.href
-                });
+                log('Sayfa aktif oldu');
+                // Last activity güncelle
+                fetch(`${CONFIG.apiUrl}/api/track/heartbeat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                }).catch(() => { });
             }
         });
 
-        // Page unload (session end)
+        // ═══════════════════════════════════════════════════════════
+        // 5. Page Unload (Session End)
+        // ═══════════════════════════════════════════════════════════
         window.addEventListener('beforeunload', () => {
-            // Session duration hesapla ve kaydet
-            const sessionStart = performance.timing.navigationStart;
-            const durationSeconds = Math.round((Date.now() - sessionStart) / 1000);
-
-            // Beacon API kullanarak (page kapatılsa bile gönderir)
-            navigator.sendBeacon(
-                `${CONFIG.apiUrl}/api/track/event`,
-                JSON.stringify({
-                    session_id: sessionId,
-                    event_type: 'page_view',
-                    event_data: {
-                        duration_seconds: durationSeconds,
-                        final_url: window.location.href
-                    }
-                })
-            );
+            // Beacon API kullan (sayfa kapatılsa bile gönderir)
+            const data = JSON.stringify({ session_id: sessionId });
+            navigator.sendBeacon(`${CONFIG.apiUrl}/api/track/end`, data);
         });
 
         log('Event tracking başlatıldı');
+    }
+
+    // Ana tracking fonksiyonu
+    async function initTracking() {
+        try {
+            log('Tracking başlatılıyor...');
+
+            // Tracking ID kontrolü
+            const trackingId = getCookie('cc_tracking_id') ||
+                getCookie('agp_tracking_id') ||
+                CONFIG.trackingId;
+
+            if (!trackingId) {
+                log('Tracking ID bulunamadı, tracking atlanıyor');
+                return;
+            }
+
+            // Cookie'lerden ad click bilgisi al
+            const adClickId = getCookie('cc_ad_click_id') || getCookie('agp_ad_click_id');
+
+            log('Tracking başlatılıyor...', {
+                trackingId: trackingId.substring(0, 10) + '...',
+                hasAdClick: !!adClickId
+            });
+
+            // ═══════════════════════════════════════════════════════════
+            // FingerprintJS Yükle ve Fingerprint Oluştur
+            // ═══════════════════════════════════════════════════════════
+            let fingerprintId = getCookie('cc_fingerprint') || getCookie('agp_fingerprint');
+            let fingerprintData = null;
+
+            if (!fingerprintId) {
+                try {
+                    const FingerprintJS = await loadFingerprintJS();
+                    const fp = await FingerprintJS.load();
+                    const result = await fp.get();
+
+                    fingerprintId = `fp_${result.visitorId}`;
+                    fingerprintData = result.components;
+
+                    log('Client fingerprint oluşturuldu:', fingerprintId.substring(0, 15) + '...');
+                } catch (error) {
+                    log('FingerprintJS hatası:', error);
+                    // Fallback: Basit fingerprint
+                    fingerprintId = `fp_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+                }
+            } else {
+                log('Cookie\'den fingerprint alındı:', fingerprintId.substring(0, 15) + '...');
+            }
+
+            // ═══════════════════════════════════════════════════════════
+            // Session Başlat
+            // ═══════════════════════════════════════════════════════════
+            const response = await fetch(`${CONFIG.apiUrl}/api/track/init`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    tracking_id: trackingId,
+                    ad_click_id: adClickId || null,
+                    fingerprint_id: fingerprintId,
+                    screen_width: window.screen.width,
+                    screen_height: window.screen.height,
+                    landing_page: window.location.href,
+                    referrer: document.referrer,
+                    fingerprint_data: fingerprintData
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.skipped) {
+                log('Session atlandı:', data.reason);
+                return;
+            }
+
+            if (data.success) {
+                const sessionId = data.session_id;
+                setSessionId(sessionId);
+
+                log('✅ Session oluşturuldu:', {
+                    sessionId: sessionId.substring(0, 15) + '...',
+                    isAdTraffic: data.is_ad_traffic,
+                    trafficSource: data.traffic_source
+                });
+
+                // Event tracking'i başlat
+                startEventTracking(sessionId);
+
+                // Heartbeat başlat
+                startHeartbeat(sessionId);
+
+            } else {
+                log('Session oluşturulamadı:', data.error);
+            }
+
+        } catch (error) {
+            log('Tracking hatası:', error);
+        }
     }
 
     // Sayfa yüklendiğinde tracking'i başlat
@@ -222,6 +296,5 @@
         initTracking();
     }
 
-    log('AdsGuardPro Tracker yüklendi');
+    log('AdsGuardsPro Tracker yüklendi v2.0');
 })();
-

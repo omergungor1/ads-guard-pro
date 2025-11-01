@@ -1,5 +1,5 @@
-// app/api/campaigns/block-ip-bulk/route.js
-// Toplu IP Engelleme - Domain'in TÜM kampanyalarına
+// app/api/campaigns/remove-ip/route.js
+// IP Engelini Kaldır - Domain'in TÜM kampanyalarından
 
 import { NextResponse } from 'next/server';
 import { supabaseAdmin, getServerSession } from '@/lib/supabase-client';
@@ -14,67 +14,36 @@ export async function POST(request) {
         }
 
         const body = await request.json();
-        const { customer_id, ip_addresses } = body;
+        const { domain_id, ip_address } = body;
 
-        if (!customer_id || !ip_addresses || !Array.isArray(ip_addresses)) {
+        if (!domain_id || !ip_address) {
             return NextResponse.json(
-                { error: 'customer_id ve ip_addresses array gerekli' },
+                { error: 'domain_id ve ip_address gerekli' },
                 { status: 400 }
             );
         }
 
-        if (ip_addresses.length === 0) {
-            return NextResponse.json(
-                { error: 'En az 1 IP adresi gerekli' },
-                { status: 400 }
-            );
-        }
-
-        // Bu customer_id'ye ait domainleri bul
-        const { data: domains, error: domainError } = await supabaseAdmin
+        // Domain'i al
+        const { data: domain, error: domainError } = await supabaseAdmin
             .from('domains')
-            .select('id, domain, ads_account_id')
-            .eq('ads_account_id', customer_id)
-            .eq('profile_id', user.id);
+            .select('id, domain, ads_account_id, profile_id')
+            .eq('id', domain_id)
+            .eq('profile_id', user.id)
+            .single();
 
-        if (domainError || !domains || domains.length === 0) {
-            return NextResponse.json({
-                error: 'Bu Google Ads hesabına bağlı domain bulunamadı'
-            }, { status: 404 });
+        if (domainError || !domain) {
+            return NextResponse.json({ error: 'Domain bulunamadı' }, { status: 404 });
         }
 
-        console.log(`📋 ${domains.length} domain bulundu (customer: ${customer_id})`);
-
-        // İlk domaini kullan (birden fazla varsa hepsine ekleyebiliriz ama şimdilik ilkini alalım)
-        const domain = domains[0];
-
-        console.log(`📤 ${ip_addresses.length} IP toplu engelleme başlatılıyor...`);
-
-        // ═══════════════════════════════════════════════════════════
-        // STEP 1: blocked_ips tablosuna toplu ekle
-        // ═══════════════════════════════════════════════════════════
-        const blockedIpInserts = ip_addresses.map(ip => ({
-            domain_id: domain.id,
-            ip: ip,
-            synced_to_ads: false,
-            block_count: 1,
-            last_seen_at: new Date().toISOString()
-        }));
-
-        const { error: bulkInsertError } = await supabaseAdmin
-            .from('blocked_ips')
-            .upsert(blockedIpInserts, {
-                onConflict: 'domain_id,ip',
-                ignoreDuplicates: false
-            });
-
-        if (bulkInsertError) {
-            console.error('Toplu IP ekleme hatası:', bulkInsertError);
-            return NextResponse.json({ error: 'IP\'ler engellenemedi' }, { status: 500 });
+        if (!domain.ads_account_id) {
+            return NextResponse.json(
+                { error: 'Domain\'e Google Ads hesabı bağlı değil' },
+                { status: 400 }
+            );
         }
 
         // ═══════════════════════════════════════════════════════════
-        // STEP 2: Domain'in TÜM aktif kampanyalarını al
+        // STEP 1: Domain'in TÜM aktif kampanyalarını al
         // ═══════════════════════════════════════════════════════════
         const { data: campaigns, error: campaignError } = await supabaseAdmin
             .from('ads_campaigns')
@@ -89,10 +58,10 @@ export async function POST(request) {
             );
         }
 
-        console.log(`📤 ${ip_addresses.length} IP, ${campaigns.length} kampanyaya gönderiliyor...`);
+        console.log(`🗑️ IP ${campaigns.length} kampanyadan kaldırılıyor:`, ip_address);
 
         // ═══════════════════════════════════════════════════════════
-        // STEP 3: Google Ads API ile TÜM kampanyalara toplu ekle
+        // STEP 2: Google Ads API ile TÜM kampanyalardan kaldır
         // ═══════════════════════════════════════════════════════════
         try {
             // Google Ads hesap bilgilerini al
@@ -106,44 +75,44 @@ export async function POST(request) {
                 throw new Error('Google Ads hesabı bulunamadı');
             }
 
-            console.log('🔑 MCC Customer ID:', adsAccount.mcc_customer_id);
-            console.log('🔑 Target Customer ID:', customer_id);
-
             const googleAdsClient = new GoogleAdsClientOfficial(
                 adsAccount.access_token,
                 adsAccount.refresh_token,
-                adsAccount.mcc_customer_id || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID
+                adsAccount.mcc_customer_id
             );
 
             let successCount = 0;
             let errorMessages = [];
 
-            // Her kampanyaya tüm IP'leri toplu ekle
+            // Her kampanyadan IP'yi kaldır
             for (const campaign of campaigns) {
                 try {
-                    await googleAdsClient.addIpExclusions(
+                    await googleAdsClient.removeIpExclusions(
                         domain.ads_account_id,
                         campaign.campaign_id,
-                        ip_addresses
+                        [ip_address]
                     );
                     successCount++;
-                    console.log(`✅ ${campaign.campaign_name}: ${ip_addresses.length} IP eklendi`);
+                    console.log(`✅ ${campaign.campaign_name}: IP kaldırıldı`);
                 } catch (error) {
                     console.error(`❌ ${campaign.campaign_name}: Hata`, error.message);
                     errorMessages.push(`${campaign.campaign_name}: ${error.message}`);
                 }
             }
 
-            // Sync durumunu güncelle
+            // ═══════════════════════════════════════════════════════════
+            // STEP 3: blocked_ips'ten sil
+            // ═══════════════════════════════════════════════════════════
             if (successCount > 0) {
-                await supabaseAdmin
+                const { error: deleteError } = await supabaseAdmin
                     .from('blocked_ips')
-                    .update({
-                        synced_to_ads: true,
-                        synced_at: new Date().toISOString()
-                    })
+                    .delete()
                     .eq('domain_id', domain.id)
-                    .in('ip', ip_addresses);
+                    .eq('ip', ip_address);
+
+                if (deleteError) {
+                    console.error('IP silme hatası:', deleteError);
+                }
 
                 // Kampanyaların last_sync_at'ini güncelle
                 await supabaseAdmin
@@ -155,22 +124,21 @@ export async function POST(request) {
 
             return NextResponse.json({
                 success: true,
-                message: `${ip_addresses.length} IP, ${successCount}/${campaigns.length} kampanyaya eklendi`,
-                ips_blocked: ip_addresses.length,
-                affected_campaigns: successCount,
+                message: `IP ${successCount}/${campaigns.length} kampanyadan kaldırıldı`,
+                campaigns_affected: successCount,
                 errors: errorMessages
             });
 
         } catch (error) {
             console.error('Google Ads API hatası:', error);
             return NextResponse.json(
-                { error: 'Google Ads\'a gönderilemedi: ' + error.message },
+                { error: 'Google Ads\'dan kaldırılamadı: ' + error.message },
                 { status: 500 }
             );
         }
 
     } catch (error) {
-        console.error('Toplu IP engelleme API hatası:', error);
+        console.error('IP kaldırma API hatası:', error);
         return NextResponse.json({ error: 'Bir hata oluştu' }, { status: 500 });
     }
 }

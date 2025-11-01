@@ -18,9 +18,8 @@ export async function GET(request, { params }) {
             .from('domains')
             .select(`
         *,
-        domain_rules(*),
         ads_campaigns(*),
-        ip_blocklist(count),
+        blocked_ips(count),
         ad_clicks(count)
       `)
             .eq('id', id)

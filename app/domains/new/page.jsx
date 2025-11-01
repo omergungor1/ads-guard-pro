@@ -12,19 +12,7 @@ export default function NewDomainPage() {
     const [formData, setFormData] = useState({
         domain: '',
         adsAccountId: '',
-        timezone: 'Europe/Istanbul',
-        rules: {
-            maxClicks: 3,
-            timeWindowDays: 15,
-            timeWindowHours: 0,
-            timeWindowMinutes: 0,
-            blockingMode: 'moderate',
-            autoBlockEnabled: true,
-            blockVpn: true,
-            blockProxy: true,
-            blockHosting: true,
-            blockTor: true
-        }
+        timezone: 'Europe/Istanbul'
     });
     const [domainId, setDomainId] = useState(null);
     const [trackingCode, setTrackingCode] = useState(null);
@@ -35,8 +23,7 @@ export default function NewDomainPage() {
         { number: 1, title: 'Domain Bilgileri', description: 'Domain ve Google Ads ID' },
         { number: 2, title: 'Google Ads Onayı', description: 'Hesap onay talimatları' },
         { number: 3, title: 'Tracking Kurulumu', description: 'Kod kurulum talimatları' },
-        { number: 4, title: 'Koruma Kuralları', description: 'Engelleme kuralları' },
-        { number: 5, title: 'Tamamlandı', description: 'Kurulum başarılı' }
+        { number: 4, title: 'Tamamlandı', description: 'Kurulum başarılı' }
     ];
 
     // Adım 1: Domain ve Ads ID ekleme
@@ -70,33 +57,6 @@ export default function NewDomainPage() {
             setTrackingCode(trackingData);
 
             setCurrentStep(2);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Adım 4: Rules kaydetme
-    const handleStep4Submit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setError(null);
-
-        try {
-            const response = await fetch(`/api/domains/${domainId}/rules`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData.rules)
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Kurallar kaydedilemedi');
-            }
-
-            setCurrentStep(5);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -302,113 +262,45 @@ export default function NewDomainPage() {
                                     onClick={() => setCurrentStep(4)}
                                     className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                                 >
-                                    Kurdum, Devam Et
+                                    Kurdum, Tamamla
                                 </button>
                             </div>
                         </div>
                     )}
 
-                    {/* Adım 4: Koruma Kuralları */}
+                    {/* Adım 4: Tamamlandı */}
                     {currentStep === 4 && (
-                        <form onSubmit={handleStep4Submit}>
-                            <h2 className="text-2xl font-bold mb-6">Koruma Kuralları</h2>
-
-                            <div className="space-y-6">
-                                {/* Click Limit */}
-                                <div>
-                                    <h3 className="text-lg font-semibold mb-3">Tıklama Limiti</h3>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Maksimum Tıklama
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                value={formData.rules.maxClicks}
-                                                onChange={(e) => setFormData({
-                                                    ...formData,
-                                                    rules: { ...formData.rules, maxClicks: parseInt(e.target.value) }
-                                                })}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Zaman Penceresi (Gün)
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={formData.rules.timeWindowDays}
-                                                onChange={(e) => setFormData({
-                                                    ...formData,
-                                                    rules: { ...formData.rules, timeWindowDays: parseInt(e.target.value) }
-                                                })}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                                            />
-                                        </div>
-                                    </div>
-                                    <p className="text-sm text-gray-600 mt-2">
-                                        Örnek: {formData.rules.maxClicks} tıklama / {formData.rules.timeWindowDays || '∞'} gün
-                                        {formData.rules.timeWindowDays === 0 && ' (İlk tıklamada engelle)'}
-                                    </p>
-                                </div>
-
-                                {/* Auto Block Settings */}
-                                <div>
-                                    <h3 className="text-lg font-semibold mb-3">Otomatik Engelleme</h3>
-                                    <div className="space-y-2">
-                                        {[
-                                            { key: 'blockVpn', label: 'VPN Kullanıcılarını Engelle' },
-                                            { key: 'blockProxy', label: 'Proxy Kullanıcılarını Engelle' },
-                                            { key: 'blockHosting', label: 'Hosting/Datacenter IP\'lerini Engelle' },
-                                            { key: 'blockTor', label: 'Tor Exit Node\'larını Engelle' }
-                                        ].map(({ key, label }) => (
-                                            <label key={key} className="flex items-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={formData.rules[key]}
-                                                    onChange={(e) => setFormData({
-                                                        ...formData,
-                                                        rules: { ...formData.rules, [key]: e.target.checked }
-                                                    })}
-                                                    className="w-4 h-4 text-blue-600 rounded"
-                                                />
-                                                <span className="ml-2 text-gray-700">{label}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="mt-6 flex justify-between">
-                                <button
-                                    type="button"
-                                    onClick={() => setCurrentStep(3)}
-                                    className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                                >
-                                    Geri
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                                >
-                                    {loading ? 'Kaydediliyor...' : 'Kaydet ve Tamamla'}
-                                </button>
-                            </div>
-                        </form>
-                    )}
-
-                    {/* Adım 5: Tamamlandı */}
-                    {currentStep === 5 && (
                         <div className="text-center py-8">
                             <div className="text-6xl mb-4">🎉</div>
                             <h2 className="text-2xl font-bold mb-4">Tebrikler!</h2>
-                            <p className="text-gray-600 mb-8">
-                                Domain kurulumu başarıyla tamamlandı. Artık botları tespit edip engelleyebilirsiniz.
+                            <p className="text-gray-600 mb-4">
+                                Domain kurulumu başarıyla tamamlandı!
                             </p>
+
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8 max-w-2xl mx-auto text-left">
+                                <h3 className="font-semibold text-green-900 mb-3 flex items-center">
+                                    <span className="text-2xl mr-2">🛡️</span>
+                                    Agresif Engelleme Aktif!
+                                </h3>
+                                <ul className="text-sm text-green-800 space-y-2">
+                                    <li className="flex items-start">
+                                        <span className="mr-2">✅</span>
+                                        <span>Ads'dan gelen <strong>TÜM IP'ler</strong> anında engellenir</span>
+                                    </li>
+                                    <li className="flex items-start">
+                                        <span className="mr-2">✅</span>
+                                        <span>Kural yok, threshold yok - <strong>tam koruma</strong></span>
+                                    </li>
+                                    <li className="flex items-start">
+                                        <span className="mr-2">✅</span>
+                                        <span>Tüm kampanyalarınız aynı IP listesi ile korunuyor</span>
+                                    </li>
+                                    <li className="flex items-start">
+                                        <span className="mr-2">✅</span>
+                                        <span>Googlebot ve diğer arama motorları whitelist'te</span>
+                                    </li>
+                                </ul>
+                            </div>
 
                             <div className="flex justify-center gap-4">
                                 <button

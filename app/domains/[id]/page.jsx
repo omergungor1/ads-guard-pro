@@ -1,52 +1,40 @@
 // app/domains/[id]/page.jsx
-// Domain detay ve yönetim sayfası
+// Domain detay ve yönetim sayfası - Agresif Engelleme Sistemi
 
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
 export default function DomainDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [domain, setDomain] = useState(null);
-    const [rules, setRules] = useState(null);
+    const [campaigns, setCampaigns] = useState([]);
+    const [blockedIps, setBlockedIps] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
-    const [activeTab, setActiveTab] = useState('overview');
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
+    const [syncingCampaigns, setSyncingCampaigns] = useState(false);
+    const [syncMessage, setSyncMessage] = useState(null);
 
     useEffect(() => {
         loadDomain();
+        loadCampaigns();
+        loadBlockedIps();
     }, [params.id]);
 
     const loadDomain = async () => {
         try {
-            const [domainRes, rulesRes] = await Promise.all([
-                fetch(`/api/domains/${params.id}`),
-                fetch(`/api/domains/${params.id}/rules`)
-            ]);
+            const response = await fetch(`/api/domains/${params.id}`);
+            const data = await response.json();
 
-            const domainData = await domainRes.json();
-            const rulesData = await rulesRes.json();
-
-            if (!domainRes.ok) {
-                throw new Error(domainData.error || 'Domain yüklenemedi');
+            if (!response.ok) {
+                throw new Error(data.error || 'Domain yüklenemedi');
             }
 
-            setDomain(domainData.domain);
-            setRules(rulesData.rules || {
-                max_clicks: 3,
-                time_window_days: 15,
-                time_window_hours: 0,
-                time_window_minutes: 0,
-                blocking_mode: 'moderate',
-                auto_block_enabled: true,
-                block_vpn: true,
-                block_proxy: true,
-                block_hosting: true,
-                block_tor: true
-            });
+            setDomain(data.domain);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -54,29 +42,27 @@ export default function DomainDetailPage() {
         }
     };
 
-    const handleSaveRules = async (e) => {
-        e.preventDefault();
-        setSaving(true);
-        setError(null);
-
+    const loadCampaigns = async () => {
         try {
-            const response = await fetch(`/api/domains/${params.id}/rules`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(rules)
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Kurallar kaydedilemedi');
+            const response = await fetch(`/api/domains/${params.id}/campaigns`);
+            if (response.ok) {
+                const data = await response.json();
+                setCampaigns(data.campaigns || []);
             }
-
-            alert('Kurallar başarıyla kaydedildi!');
         } catch (err) {
-            setError(err.message);
-        } finally {
-            setSaving(false);
+            console.error('Kampanyalar yüklenemedi:', err);
+        }
+    };
+
+    const loadBlockedIps = async () => {
+        try {
+            const response = await fetch(`/api/campaigns/blocked-ips?domain_id=${params.id}`);
+            if (response.ok) {
+                const data = await response.json();
+                setBlockedIps(data.blocked_ips || []);
+            }
+        } catch (err) {
+            console.error('Engellenen IP\'ler yüklenemedi:', err);
         }
     };
 
@@ -99,6 +85,55 @@ export default function DomainDetailPage() {
             router.push('/dashboard');
         } catch (err) {
             alert(err.message);
+        }
+    };
+
+    const handleSyncCampaigns = async () => {
+        setSyncingCampaigns(true);
+        setSyncMessage(null);
+
+        try {
+            const response = await fetch(`/api/domains/${params.id}/campaigns`, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Kampanyalar senkronize edilemedi');
+            }
+
+            // Başarılı - kampanya listesini güncelle
+            setCampaigns(data.campaigns || []);
+
+            // Başarı mesajı göster
+            const { stats } = data;
+            const messages = [];
+            if (stats.added > 0) messages.push(`${stats.added} yeni kampanya eklendi`);
+            if (stats.updated > 0) messages.push(`${stats.updated} kampanya güncellendi`);
+            if (stats.deactivated > 0) messages.push(`${stats.deactivated} kampanya deaktif edildi`);
+
+            const successMessage = messages.length > 0
+                ? messages.join(', ')
+                : 'Kampanyalar güncel, değişiklik yok';
+
+            setSyncMessage({
+                type: 'success',
+                text: `✅ ${successMessage}`
+            });
+
+            // 5 saniye sonra mesajı temizle
+            setTimeout(() => setSyncMessage(null), 5000);
+
+        } catch (err) {
+            setSyncMessage({
+                type: 'error',
+                text: `❌ ${err.message}`
+            });
+            // Hata mesajını 8 saniye göster
+            setTimeout(() => setSyncMessage(null), 8000);
+        } finally {
+            setSyncingCampaigns(false);
         }
     };
 
@@ -171,7 +206,8 @@ export default function DomainDetailPage() {
                     <div className="flex space-x-8">
                         {[
                             { id: 'overview', label: 'Genel Bakış' },
-                            { id: 'rules', label: 'Koruma Kuralları' },
+                            { id: 'protection', label: 'Koruma Sistemi' },
+                            { id: 'campaigns', label: 'Kampanyalar' },
                             { id: 'tracking', label: 'Tracking Kodları' },
                             { id: 'stats', label: 'İstatistikler' }
                         ].map(tab => (
@@ -227,177 +263,190 @@ export default function DomainDetailPage() {
                                     </p>
                                 </div>
                             </div>
+
+                            {/* Quick Stats */}
+                            <div className="grid grid-cols-3 gap-4 mt-8">
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <div className="text-sm text-blue-600 mb-1">Kampanyalar</div>
+                                    <div className="text-2xl font-bold text-blue-900">{campaigns.length}</div>
+                                </div>
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <div className="text-sm text-red-600 mb-1">Engellenen IP</div>
+                                    <div className="text-2xl font-bold text-red-900">{blockedIps.length}</div>
+                                </div>
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <div className="text-sm text-green-600 mb-1">Durum</div>
+                                    <div className="text-lg font-bold text-green-900">
+                                        {domain.is_active ? '🛡️ Korunuyor' : '⚠️ Pasif'}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
-                    {/* Rules Tab */}
-                    {activeTab === 'rules' && (
-                        <form onSubmit={handleSaveRules}>
-                            <h2 className="text-2xl font-bold mb-6">Koruma Kuralları</h2>
+                    {/* Protection System Tab */}
+                    {activeTab === 'protection' && (
+                        <div className="space-y-6">
+                            <h2 className="text-2xl font-bold mb-4">Agresif Engelleme Sistemi</h2>
 
-                            {error && (
-                                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-                                    {error}
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                                <div className="flex items-start">
+                                    <div className="text-4xl mr-4">🛡️</div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-green-900 mb-2">
+                                            Agresif Koruma Aktif
+                                        </h3>
+                                        <p className="text-green-800 mb-3">
+                                            Domain'iniz maksimum koruma seviyesinde. Ads'dan gelen tüm IP'ler anında engelleniyor.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-semibold">Koruma Özellikleri</h3>
+
+                                <div className="space-y-3">
+                                    <div className="flex items-start border-b pb-3">
+                                        <span className="text-green-600 mr-3 text-xl">✅</span>
+                                        <div>
+                                            <div className="font-medium">Anında Engelleme</div>
+                                            <div className="text-sm text-gray-600">
+                                                Ads'dan gelen HER IP anında engellenir, kural ve threshold yok
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start border-b pb-3">
+                                        <span className="text-green-600 mr-3 text-xl">✅</span>
+                                        <div>
+                                            <div className="font-medium">Domain Bazlı Koruma</div>
+                                            <div className="text-sm text-gray-600">
+                                                Bir IP engellendi mi? Tüm kampanyalarınızdan otomatik engellenir
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start border-b pb-3">
+                                        <span className="text-green-600 mr-3 text-xl">✅</span>
+                                        <div>
+                                            <div className="font-medium">Whitelist Koruması</div>
+                                            <div className="text-sm text-gray-600">
+                                                Googlebot, Bingbot ve diğer arama motorları otomatik whitelist'te
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start border-b pb-3">
+                                        <span className="text-green-600 mr-3 text-xl">✅</span>
+                                        <div>
+                                            <div className="font-medium">IP-API Entegrasyonu</div>
+                                            <div className="text-sm text-gray-600">
+                                                Her IP için konum, ISP ve tehdit bilgisi otomatik toplanır
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start pb-3">
+                                        <span className="text-green-600 mr-3 text-xl">✅</span>
+                                        <div>
+                                            <div className="font-medium">Otomatik Kampanya Tespiti</div>
+                                            <div className="text-sm text-gray-600">
+                                                Yeni kampanyalar otomatik tespit edilip koruma altına alınır
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+                                <h4 className="font-semibold text-blue-900 mb-2">📊 İstatistikler</h4>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span className="text-blue-700">Engellenen IP:</span>
+                                        <span className="font-bold ml-2">{blockedIps.length}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-blue-700">Korunan Kampanya:</span>
+                                        <span className="font-bold ml-2">{campaigns.length}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Campaigns Tab */}
+                    {activeTab === 'campaigns' && (
+                        <div>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-2xl font-bold">Kampanyalar</h2>
+                                <button
+                                    onClick={handleSyncCampaigns}
+                                    disabled={syncingCampaigns}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                                >
+                                    {syncingCampaigns ? (
+                                        <>
+                                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                            </svg>
+                                            Senkronize ediliyor...
+                                        </>
+                                    ) : (
+                                        <>
+                                            🔄 Kampanyaları Güncelle
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+
+                            {syncMessage && (
+                                <div className={`mb-4 p-4 rounded-lg border ${syncMessage.type === 'success'
+                                    ? 'bg-green-50 border-green-200 text-green-800'
+                                    : 'bg-red-50 border-red-200 text-red-800'
+                                    }`}>
+                                    {syncMessage.text}
                                 </div>
                             )}
 
-                            <div className="space-y-6">
-                                {/* Click Limit */}
-                                <div className="border-b pb-6">
-                                    <h3 className="text-lg font-semibold mb-4">Tıklama Limiti</h3>
-                                    <div className="grid grid-cols-4 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Maksimum Tıklama
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                value={rules.max_clicks}
-                                                onChange={(e) => setRules({ ...rules, max_clicks: parseInt(e.target.value) })}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Gün
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={rules.time_window_days}
-                                                onChange={(e) => setRules({ ...rules, time_window_days: parseInt(e.target.value) })}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Saat
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="23"
-                                                value={rules.time_window_hours}
-                                                onChange={(e) => setRules({ ...rules, time_window_hours: parseInt(e.target.value) })}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Dakika
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="59"
-                                                value={rules.time_window_minutes}
-                                                onChange={(e) => setRules({ ...rules, time_window_minutes: parseInt(e.target.value) })}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                                            />
-                                        </div>
-                                    </div>
-                                    <p className="text-sm text-gray-600 mt-2">
-                                        <strong>Kural:</strong> {rules.max_clicks} tıklama /
-                                        {rules.time_window_days > 0 && ` ${rules.time_window_days} gün`}
-                                        {rules.time_window_hours > 0 && ` ${rules.time_window_hours} saat`}
-                                        {rules.time_window_minutes > 0 && ` ${rules.time_window_minutes} dakika`}
-                                        {rules.time_window_days === 0 && rules.time_window_hours === 0 && rules.time_window_minutes === 0 && ' ∞ (İlk tıklamada engelle)'}
+                            {campaigns.length === 0 ? (
+                                <div className="text-center py-8 text-gray-600">
+                                    <p>Henüz kampanya eklenmedi.</p>
+                                    <p className="text-sm mt-2">
+                                        Kampanyalar otomatik olarak tracking URL'den tespit edilir.
                                     </p>
                                 </div>
-
-                                {/* Auto Block */}
-                                <div className="border-b pb-6">
-                                    <h3 className="text-lg font-semibold mb-4">Otomatik Engelleme</h3>
-                                    <div className="space-y-3">
-                                        <label className="flex items-center">
-                                            <input
-                                                type="checkbox"
-                                                checked={rules.auto_block_enabled}
-                                                onChange={(e) => setRules({ ...rules, auto_block_enabled: e.target.checked })}
-                                                className="w-4 h-4 text-blue-600 rounded"
-                                            />
-                                            <span className="ml-2 text-gray-700 font-medium">Otomatik Engelleme Aktif</span>
-                                        </label>
-
-                                        {rules.auto_block_enabled && (
-                                            <div className="ml-6 space-y-2">
-                                                {[
-                                                    { key: 'block_vpn', label: 'VPN Kullanıcılarını Engelle' },
-                                                    { key: 'block_proxy', label: 'Proxy Kullanıcılarını Engelle' },
-                                                    { key: 'block_hosting', label: 'Hosting/Datacenter IP\'lerini Engelle' },
-                                                    { key: 'block_tor', label: 'Tor Exit Node\'larını Engelle' }
-                                                ].map(({ key, label }) => (
-                                                    <label key={key} className="flex items-center">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={rules[key]}
-                                                            onChange={(e) => setRules({ ...rules, [key]: e.target.checked })}
-                                                            className="w-4 h-4 text-blue-600 rounded"
-                                                        />
-                                                        <span className="ml-2 text-gray-700">{label}</span>
-                                                    </label>
-                                                ))}
+                            ) : (
+                                <div className="space-y-3">
+                                    {campaigns.map((campaign) => (
+                                        <div key={campaign.id} className="border border-gray-200 rounded-lg p-4">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h3 className="font-semibold text-gray-900">
+                                                        {campaign.campaign_name || campaign.campaign_id}
+                                                    </h3>
+                                                    <p className="text-sm text-gray-600">
+                                                        ID: {campaign.campaign_id}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        Eklenme: {campaign.added_method === 'manual' ? 'Manuel' : 'Otomatik'}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${campaign.is_active
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : 'bg-gray-100 text-gray-800'
+                                                        }`}>
+                                                        {campaign.is_active ? 'Aktif' : 'Pasif'}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    ))}
                                 </div>
-
-                                {/* Session Settings */}
-                                <div>
-                                    <h3 className="text-lg font-semibold mb-4">Session Ayarları</h3>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Min. Session Süresi (sn)
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={rules.min_session_duration_seconds || 5}
-                                                onChange={(e) => setRules({ ...rules, min_session_duration_seconds: parseInt(e.target.value) })}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Maks. Tıklama/Session
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                value={rules.max_clicks_per_session || 10}
-                                                onChange={(e) => setRules({ ...rules, max_clicks_per_session: parseInt(e.target.value) })}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Min. Scroll Derinliği (%)
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                value={rules.min_scroll_depth_percent || 10}
-                                                onChange={(e) => setRules({ ...rules, min_scroll_depth_percent: parseInt(e.target.value) })}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="mt-8 flex justify-end">
-                                <button
-                                    type="submit"
-                                    disabled={saving}
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                                >
-                                    {saving ? 'Kaydediliyor...' : 'Kuralları Kaydet'}
-                                </button>
-                            </div>
-                        </form>
+                            )}
+                        </div>
                     )}
 
                     {/* Tracking Tab */}
@@ -409,9 +458,43 @@ export default function DomainDetailPage() {
                     {activeTab === 'stats' && (
                         <div>
                             <h2 className="text-2xl font-bold mb-4">İstatistikler</h2>
-                            <p className="text-gray-600">
-                                İstatistikler yakında eklenecek...
-                            </p>
+
+                            <div className="grid grid-cols-2 gap-6 mb-8">
+                                <div className="border border-gray-200 rounded-lg p-6">
+                                    <h3 className="text-lg font-semibold mb-4">Engellenen IP'ler</h3>
+                                    <div className="text-3xl font-bold text-red-600">{blockedIps.length}</div>
+                                    <p className="text-sm text-gray-600 mt-2">Toplam engelleme</p>
+                                </div>
+
+                                <div className="border border-gray-200 rounded-lg p-6">
+                                    <h3 className="text-lg font-semibold mb-4">Kampanyalar</h3>
+                                    <div className="text-3xl font-bold text-blue-600">{campaigns.length}</div>
+                                    <p className="text-sm text-gray-600 mt-2">Korunan kampanya</p>
+                                </div>
+                            </div>
+
+                            {blockedIps.length > 0 && (
+                                <div>
+                                    <h3 className="text-lg font-semibold mb-3">Son Engellenen IP'ler</h3>
+                                    <div className="space-y-2">
+                                        {blockedIps.slice(0, 10).map((item, idx) => (
+                                            <div key={idx} className="flex justify-between items-center border-b pb-2">
+                                                <div>
+                                                    <span className="font-mono">{item.ip}</span>
+                                                    {item.ip_info && (
+                                                        <span className="text-sm text-gray-600 ml-2">
+                                                            ({item.ip_info.city}, {item.ip_info.country_code})
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-sm text-gray-500">
+                                                    {new Date(item.blocked_at).toLocaleString('tr-TR')}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -467,6 +550,9 @@ function TrackingCodesTab({ domainId }) {
                         Kopyala
                     </button>
                 </div>
+                <p className="text-sm text-gray-600">
+                    Bu kodu sitenizin &lt;head&gt; bölümüne ekleyin.
+                </p>
             </div>
 
             {/* Tracking Template */}
@@ -483,8 +569,19 @@ function TrackingCodesTab({ domainId }) {
                         Kopyala
                     </button>
                 </div>
+                <p className="text-sm text-gray-600">
+                    Bu URL'i Google Ads hesabınızda Account Settings → Tracking → Tracking template alanına ekleyin.
+                </p>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h4 className="font-semibold text-yellow-900 mb-2">⚠️ Önemli</h4>
+                <ul className="text-sm text-yellow-800 space-y-1 list-disc list-inside">
+                    <li>Tracking Template mutlaka Google Ads hesabınızda ayarlanmalıdır</li>
+                    <li>Site tracking scripti opsiyonel ama önerilir (daha iyi analiz)</li>
+                    <li>Değişiklikler 24 saat içinde etkili olur</li>
+                </ul>
             </div>
         </div>
     );
 }
-
