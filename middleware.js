@@ -7,6 +7,11 @@ import { createClient } from '@supabase/supabase-js';
 export async function middleware(request) {
     const { pathname } = request.nextUrl;
 
+    // OPTIONS isteklerini (CORS preflight) direkt geç
+    if (request.method === 'OPTIONS') {
+        return NextResponse.next();
+    }
+
     // Public routes (herkes erişebilir)
     const publicPaths = [
         '/login',
@@ -14,6 +19,8 @@ export async function middleware(request) {
         '/api/tracker',
         '/api/track/init',
         '/api/track/event',
+        '/api/track/heartbeat',
+        '/api/track/end',
         '/js/tracker.js',
         '/_next',
         '/favicon.ico',
