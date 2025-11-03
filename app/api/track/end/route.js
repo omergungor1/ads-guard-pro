@@ -4,6 +4,17 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-client';
 
+// CORS Headers
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+    return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(request) {
     try {
         const body = await request.json();
@@ -12,7 +23,7 @@ export async function POST(request) {
         if (!session_id) {
             return NextResponse.json(
                 { error: 'session_id gerekli' },
-                { status: 400 }
+                { status: 400, headers: corsHeaders }
             );
         }
 
@@ -26,7 +37,7 @@ export async function POST(request) {
         if (!session) {
             return NextResponse.json(
                 { error: 'Session bulunamadı' },
-                { status: 404 }
+                { status: 404, headers: corsHeaders }
             );
         }
 
@@ -48,20 +59,20 @@ export async function POST(request) {
             console.error('Session sonlandırma hatası:', error);
             return NextResponse.json(
                 { error: 'Session sonlandırılamadı' },
-                { status: 500 }
+                { status: 500, headers: corsHeaders }
             );
         }
 
         return NextResponse.json({
             success: true,
             duration_seconds: durationSeconds
-        });
+        }, { headers: corsHeaders });
 
     } catch (error) {
         console.error('Session end hatası:', error);
         return NextResponse.json(
             { error: 'Bir hata oluştu' },
-            { status: 500 }
+            { status: 500, headers: corsHeaders }
         );
     }
 }

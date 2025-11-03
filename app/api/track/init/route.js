@@ -12,6 +12,18 @@ import {
     extractGclid
 } from '@/lib/helpers';
 
+// CORS Headers
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// OPTIONS için preflight handler
+export async function OPTIONS() {
+    return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(request) {
     try {
         const body = await request.json();
@@ -31,7 +43,7 @@ export async function POST(request) {
         if (!tracking_id || !fingerprint_id) {
             return NextResponse.json(
                 { error: 'tracking_id ve fingerprint_id gerekli' },
-                { status: 400 }
+                { status: 400, headers: corsHeaders }
             );
         }
 
@@ -61,7 +73,7 @@ export async function POST(request) {
         if (domainError || !domain) {
             return NextResponse.json(
                 { error: 'Domain bulunamadı' },
-                { status: 404 }
+                { status: 404, headers: corsHeaders }
             );
         }
 
@@ -75,7 +87,7 @@ export async function POST(request) {
             return NextResponse.json({
                 skipped: true,
                 reason: 'whitelisted'
-            });
+            }, { headers: corsHeaders });
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -199,13 +211,13 @@ export async function POST(request) {
             session_id: session.id,
             is_ad_traffic: isAdTraffic,
             traffic_source: trafficSource
-        });
+        }, { headers: corsHeaders });
 
     } catch (error) {
         console.error('❌ Track init hatası:', error);
         return NextResponse.json(
             { error: 'Bir hata oluştu' },
-            { status: 500 }
+            { status: 500, headers: corsHeaders }
         );
     }
 }

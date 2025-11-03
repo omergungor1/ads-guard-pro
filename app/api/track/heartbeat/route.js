@@ -4,6 +4,17 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-client';
 
+// CORS Headers
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+    return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(request) {
     try {
         const body = await request.json();
@@ -12,7 +23,7 @@ export async function POST(request) {
         if (!session_id) {
             return NextResponse.json(
                 { error: 'session_id gerekli' },
-                { status: 400 }
+                { status: 400, headers: corsHeaders }
             );
         }
 
@@ -26,17 +37,17 @@ export async function POST(request) {
             console.error('Heartbeat güncelleme hatası:', error);
             return NextResponse.json(
                 { error: 'Heartbeat güncellenemedi' },
-                { status: 500 }
+                { status: 500, headers: corsHeaders }
             );
         }
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true }, { headers: corsHeaders });
 
     } catch (error) {
         console.error('Heartbeat hatası:', error);
         return NextResponse.json(
             { error: 'Bir hata oluştu' },
-            { status: 500 }
+            { status: 500, headers: corsHeaders }
         );
     }
 }
