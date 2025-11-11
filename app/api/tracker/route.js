@@ -75,15 +75,51 @@ export async function GET(request) {
         const acceptLanguage = request.headers.get('accept-language') || '';
 
         // ═══════════════════════════════════════════════════════════
-        // STEP 2: GENERATE TRACKING IDs (Client-side cookies)
+        // STEP 2: PRESERVE GOOGLE & UTM PARAMETERS
+        // ═══════════════════════════════════════════════════════════
+        // Internal parameters (our tracking params - DO NOT add to final URL)
+        const internalParams = new Set([
+            'id',                    // Our tracking ID
+            'force_transparent',     // Our control param
+            'redirection_url',       // Transparency param (already used)
+            'campaign_id',           // Our internal tracking
+            'keyword',               // Our internal tracking
+            'device',                // Our internal tracking
+            'network',               // Our internal tracking
+            'adpos',                 // Our internal tracking
+            'placement'              // Our internal tracking
+        ]);
+
+        // Collect all other parameters (Google tracking, UTM, custom)
+        const paramsToPreserve = new URLSearchParams();
+
+        for (const [key, value] of searchParams.entries()) {
+            // Skip internal parameters
+            if (!internalParams.has(key)) {
+                paramsToPreserve.append(key, value);
+            }
+        }
+
+        // Add preserved parameters to redirection URL
+        let finalRedirectUrl = redirectionUrl;
+
+        if (paramsToPreserve.toString()) {
+            const separator = redirectionUrl.includes('?') ? '&' : '?';
+            finalRedirectUrl = `${redirectionUrl}${separator}${paramsToPreserve.toString()}`;
+
+            console.log('✅ Parameters preserved:', paramsToPreserve.toString());
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // STEP 3: GENERATE TRACKING IDs (Client-side cookies)
         // ═══════════════════════════════════════════════════════════
         const clickId = nanoid(32);
         const fingerprintId = `fp_${Date.now()}_${nanoid(16)}`;
 
         // ═══════════════════════════════════════════════════════════
-        // STEP 3: FAST REDIRECT WITH COOKIES (Google Requirement: Fast Response)
+        // STEP 4: FAST REDIRECT WITH COOKIES (Google Requirement: Fast Response)
         // ═══════════════════════════════════════════════════════════
-        const response = NextResponse.redirect(redirectionUrl, { status: 302 });
+        const response = NextResponse.redirect(finalRedirectUrl, { status: 302 });
 
         // Set tracking cookies for site tracking script
         response.cookies.set('ag_click_id', clickId, {
@@ -114,7 +150,7 @@ export async function GET(request) {
         console.log(`✅ Fast redirect completed (${redirectTime}ms)`);
 
         // ═══════════════════════════════════════════════════════════
-        // STEP 4: BACKGROUND PROCESSING (Non-blocking)
+        // STEP 5: BACKGROUND PROCESSING (Non-blocking)
         // ═══════════════════════════════════════════════════════════
         // Fire-and-forget: Send click data to background processor
         // This runs asynchronously without blocking the redirect
@@ -127,6 +163,7 @@ export async function GET(request) {
             user_agent: userAgent,
             accept_language: acceptLanguage,
             redirection_url: redirectionUrl,
+            final_redirect_url: finalRedirectUrl,
             campaign_id: campaignId,
             gclid: gclid,
             keyword: keyword,
@@ -135,7 +172,8 @@ export async function GET(request) {
             ad_position: adPosition,
             placement: placement,
             timestamp: new Date().toISOString(),
-            all_params: Object.fromEntries(searchParams)
+            all_params: Object.fromEntries(searchParams),
+            preserved_params: paramsToPreserve.toString()
         };
 
         // Send to background worker (fire and forget)
@@ -152,6 +190,7 @@ export async function GET(request) {
             trackingId: trackingId.substring(0, 10) + '...',
             ip,
             redirectTo: validatedUrl.hostname,
+            paramsPreserved: paramsToPreserve.toString() || 'none',
             totalTime: Date.now() - startTime + 'ms'
         });
 

@@ -15,6 +15,7 @@ export async function middleware(request) {
     // Public routes (herkes erişebilir)
     const publicPaths = [
         '/login',
+        '/docs',
         '/api/auth/session',
         '/api/tracker',
         '/api/track/init',

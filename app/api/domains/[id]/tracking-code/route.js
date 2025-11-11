@@ -30,19 +30,17 @@ export async function GET(request, { params }) {
             return NextResponse.json({ error: 'Domain bulunamadı' }, { status: 404 });
         }
 
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://yourdomain.com';
-
         // Tracking script kodu
         const trackingScript = `<!-- AdsGuardPro Tracking Script -->
 <script>
   window.ag_tracking_id = '${domain.tracking_id}';
-  window.ag_api_url = '${appUrl}';
+  window.ag_api_url = 'https://app.adguardy.com';
 </script>
-<script src="${appUrl.replace('app.', '')}/js/tracker.js" async></script>
+<script src="https://www.adguardy.com/js/tracker.js" async></script>
 <!-- End AdsGuardPro -->`;
 
         // Google Ads Tracking Template URL (Google Certified - Compliant with Transparency Guidelines)
-        const trackingTemplateUrl = `${appUrl}/api/tracker?force_transparent=true&id=${domain.tracking_id}&redirection_url={lpurl}&campaign_id={campaignid}&gclid={gclid}&keyword={keyword}&device={device}&network={network}&adpos={adposition}&placement={placement}`;
+        const trackingTemplateUrl = `https://app.adguardy.com/api/tracker?force_transparent=true&id=${domain.tracking_id}&redirection_url={lpurl}&campaign_id={campaignid}&gclid={gclid}&keyword={keyword}&device={device}&network={network}&adpos={adposition}&placement={placement}`;
 
         return NextResponse.json({
             tracking_script: trackingScript,

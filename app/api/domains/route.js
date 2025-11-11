@@ -156,7 +156,7 @@ export async function POST(request) {
         }
 
         // Tracking URL'i oluştur
-        const trackingUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://yourdomain.com'}/api/tracker?id=${trackingId}&campaign_id={campaignid}&gclid={gclid}&keyword={keyword}&device={device}&network={network}&adpos={adposition}&placement={placement}&url={lpurl}`;
+        const trackingUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.adguardy.com'}/api/tracker?id=${trackingId}&campaign_id={campaignid}&gclid={gclid}&keyword={keyword}&device={device}&network={network}&adpos={adposition}&placement={placement}&url={lpurl}`;
 
         return NextResponse.json({
             success: true,
