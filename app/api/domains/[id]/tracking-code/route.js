@@ -38,7 +38,7 @@ export async function GET(request, { params }) {
   window.ag_tracking_id = '${domain.tracking_id}';
   window.ag_api_url = '${appUrl}';
 </script>
-<script src="${appUrl}/js/tracker.js" async></script>
+<script src="${appUrl.replace('app.', '')}/js/tracker.js" async></script>
 <!-- End AdsGuardPro -->`;
 
         // Google Ads Tracking Template URL (Google Certified - Compliant with Transparency Guidelines)
