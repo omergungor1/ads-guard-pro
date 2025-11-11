@@ -7,7 +7,7 @@
 
     // Konfigürasyon
     const CONFIG = {
-        apiUrl: window.AGP_API_URL || (window.location.protocol + '//' + window.location.host),
+        apiUrl: window.ag_api_url || (window.location.protocol + '//' + window.location.host),
         trackingId: window.ag_tracking_id || null,
         debug: window.AGP_DEBUG || false
     };

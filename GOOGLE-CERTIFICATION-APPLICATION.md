@@ -12,9 +12,12 @@
 We wish to certify the following domains for use as third-party click tracking services:
 
 - **Primary Domain:** `adguardy.com`
-- **Tracking Endpoint:** `https://adguardy.com/api/tracker`
+- **App Subdomain:** `app.adguardy.com` (Main application and API endpoint)
+- **Tracking Endpoint:** `https://app.adguardy.com/api/tracker`
 
 All subdomains under `adguardy.com` will use the same certified tracking infrastructure.
+
+**Note:** Our main application runs on `app.adguardy.com` subdomain where all API endpoints are hosted.
 
 ---
 
@@ -23,7 +26,7 @@ All subdomains under `adguardy.com` will use the same certified tracking infrast
 ### Example Tracking URL Structure
 
 ```
-https://adguardy.com/api/tracker?force_transparent=true&id=abc123xyz&redirection_url=https://example.com/landing-page&campaign_id=12345678&gclid=abc123def456&keyword=example+keyword&device=mobile&network=search&adpos=1t1
+https://app.adguardy.com/api/tracker?force_transparent=true&id=abc123xyz&redirection_url=https://example.com/landing-page&campaign_id=12345678&gclid=abc123def456&keyword=example+keyword&device=mobile&network=search&adpos=1t1
 ```
 
 ### Real-World Example Flow
@@ -31,7 +34,7 @@ https://adguardy.com/api/tracker?force_transparent=true&id=abc123xyz&redirection
 **Step 1:** User clicks on Google Ad  
 **Step 2:** Google redirects to our tracking URL:
 ```
-https://adguardy.com/api/tracker?force_transparent=true&id=usr_tracking_001&redirection_url=https://example.com/products/shoes&campaign_id=9876543210&gclid=TeSter-20230101_click_id_example&keyword=running+shoes&device=mobile&network=search&adpos=1t2
+https://app.adguardy.com/api/tracker?force_transparent=true&id=usr_tracking_001&redirection_url=https://example.com/products/shoes&campaign_id=9876543210&gclid=TeSter-20230101_click_id_example&keyword=running+shoes&device=mobile&network=search&adpos=1t2
 ```
 
 **Step 3:** Our tracker performs:
@@ -53,16 +56,17 @@ Our customers implement tracking by:
 
 1. **Adding tracking template in Google Ads:**
 ```
-https://adguardy.com/api/tracker?force_transparent=true&id={tracking_id}&redirection_url={lpurl}&campaign_id={campaignid}&gclid={gclid}&keyword={keyword}&device={device}&network={network}&adpos={adposition}
+https://app.adguardy.com/api/tracker?force_transparent=true&id={tracking_id}&redirection_url={lpurl}&campaign_id={campaignid}&gclid={gclid}&keyword={keyword}&device={device}&network={network}&adpos={adposition}
 ```
 
 2. **Installing site tracking script on their landing page:**
 ```html
 <script>
   window.ag_tracking_id = 'usr_tracking_001';
+  window.ag_api_url = 'https://app.adguardy.com';
   window.AGP_DEBUG = false;
 </script>
-<script src="https://adguardy.com/js/tracker.js" async></script>
+<script src="https://app.adguardy.com/js/tracker.js" async></script>
 ```
 
 ---
@@ -77,7 +81,7 @@ https://adguardy.com/api/tracker?force_transparent=true&id={tracking_id}&redirec
 
 **Example:**
 ```
-https://adguardy.com/api/tracker?redirection_url=https://example.com/landing-page
+https://app.adguardy.com/api/tracker?redirection_url=https://example.com/landing-page
 ```
 
 ### Secondary Control Parameter (Optional)
@@ -90,7 +94,7 @@ https://adguardy.com/api/tracker?redirection_url=https://example.com/landing-pag
 
 **Example:**
 ```
-https://adguardy.com/api/tracker?force_transparent=true&redirection_url=https://example.com/
+https://app.adguardy.com/api/tracker?force_transparent=true&redirection_url=https://example.com/
 ```
 
 ### Transparency Guarantee
@@ -234,7 +238,7 @@ All our tracking domains are SSL-compliant:
 
 **Test SSL Compliance:**
 ```bash
-curl -I https://adguardy.com/api/tracker
+curl -I https://app.adguardy.com/api/tracker
 # Returns: Strict-Transport-Security: max-age=31536000
 ```
 
@@ -256,7 +260,7 @@ curl -I https://adguardy.com/api/tracker
            ▼
 ┌─────────────────────────────────────────────┐
 │  Tracking Endpoint                          │
-│  https://adguardy.com/api/tracker          │
+│  https://app.adguardy.com/api/tracker      │
 │                                             │
 │  ✅ URL Validation                          │
 │  ✅ Cookie Setting                          │
@@ -393,15 +397,16 @@ Google is welcome to test our tracking service at any time:
 
 **Test URL:**
 ```
-https://adguardy.com/api/tracker?force_transparent=true&id=test_google_cert&redirection_url=https://google.com
+https://app.adguardy.com/api/tracker?force_transparent=true&id=test_google_cert&redirection_url=https://google.com
 ```
 
 **Expected Behavior:**
 1. Immediate redirect to `https://google.com`
-2. Response time < 100ms
+2. Response time < 200ms (ideally < 100ms)
 3. No intermediate domains
-4. HTTPS secure connection
+4. HTTPS secure connection (TLS 1.3)
 5. No parameters added to final URL
+6. Cookies set: ag_click_id, ag_tracking_id, ag_fingerprint
 
 ---
 

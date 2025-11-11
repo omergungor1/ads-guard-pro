@@ -192,15 +192,17 @@ https://adguardy.com/api/tracker?force_transparent=true&id=usr_abc123xyz&redirec
 
 ## 🧪 Test Etme
 
+⚠️ **ÖNEMLİ:** API'ler `https://app.adguardy.com` subdomain'i altında çalışır!
+
 ### 1. Manuel Test (cURL)
 
 ```bash
-# Basit test
-curl -I "https://adguardy.com/api/tracker?force_transparent=true&id=test001&redirection_url=https://google.com"
+# Basit test (DOĞRU URL!)
+curl -I "https://app.adguardy.com/api/tracker?force_transparent=true&id=test001&redirection_url=https://google.com"
 
 # Beklenen Response:
 # HTTP/2 302
-# location: https://google.com
+# location: https://google.com (DEĞİŞMEMİŞ!)
 # set-cookie: ag_click_id=...
 # set-cookie: ag_tracking_id=...
 # set-cookie: ag_fingerprint=...
@@ -209,37 +211,39 @@ curl -I "https://adguardy.com/api/tracker?force_transparent=true&id=test001&redi
 ### 2. Response Time Test
 
 ```bash
-time curl -I "https://adguardy.com/api/tracker?force_transparent=true&id=test001&redirection_url=https://google.com"
+time curl -I "https://app.adguardy.com/api/tracker?force_transparent=true&id=test001&redirection_url=https://google.com"
 
-# Beklenen: < 100ms
+# Beklenen: < 200ms (170ms kabul edilebilir)
+# İdeal: < 100ms
 ```
 
 ### 3. Full Flow Test
 
 ```bash
-# Test tracking URL
-TEST_URL="https://adguardy.com/api/tracker?force_transparent=true&id=test001&redirection_url=https://example.com/page&campaign_id=123&gclid=abc123&keyword=test&device=mobile&network=search&adpos=1t1"
+# Test tracking URL (DOĞRU URL!)
+TEST_URL="https://app.adguardy.com/api/tracker?force_transparent=true&id=test001&redirection_url=https://example.com/page&campaign_id=123&gclid=abc123&keyword=test&device=mobile&network=search&adpos=1t1"
 
 curl -v "$TEST_URL"
 
 # Kontrol edilecekler:
 # ✅ 302 redirect
-# ✅ Location header = https://example.com/page (değişmemiş)
+# ✅ Location header = https://example.com/page (DEĞİŞMEMİŞ!)
 # ✅ Cookies set edilmiş
-# ✅ Response time < 100ms
+# ✅ Response time < 200ms
 ```
 
 ### 4. Browser Test
 
 1. Tarayıcıda aç:
 ```
-https://adguardy.com/api/tracker?force_transparent=true&id=test001&redirection_url=https://google.com
+https://app.adguardy.com/api/tracker?force_transparent=true&id=test001&redirection_url=https://google.com
 ```
 
 2. Kontrol et:
    - ✅ Hemen google.com'a yönlendirildin mi?
    - ✅ Cookie'ler set edildi mi? (DevTools → Application → Cookies)
-   - ✅ Network tab'de response time < 100ms mi?
+   - ✅ Network tab'de response time kontrol et
+   - ✅ Location header'ı kontrol et (https://google.com olmalı)
 
 ---
 
@@ -257,11 +261,13 @@ Dökümanlar hazır:
 2. "Click Tracker Certification" başvuru formunu doldur
 3. Aşağıdaki bilgileri gönder:
 
-**Domain:** adguardy.com
+**Domains to Certify:**
+- Primary: `adguardy.com`
+- App Subdomain: `app.adguardy.com` (API endpoint)
 
 **Örnek Tracking URL:**
 ```
-https://adguardy.com/api/tracker?force_transparent=true&id=test_google&redirection_url=https://example.com/
+https://app.adguardy.com/api/tracker?force_transparent=true&id=test_google&redirection_url=https://example.com/
 ```
 
 **Transparency Parameter:** `redirection_url`
@@ -270,16 +276,18 @@ https://adguardy.com/api/tracker?force_transparent=true&id=test_google&redirecti
 
 **Compliance:** YES - Full compliance with all guidelines
 
-**Public Registration:** YES - Domain publicly registered
+**Public Registration:** YES - Both domains publicly registered
 
-**SSL Compliance:** YES - Full SSL/TLS compliance
+**SSL Compliance:** YES - Full SSL/TLS compliance on all domains
 
 ### Adım 3: Test Endpoint Sağla
 
 Google test edebilsin diye:
 ```
-https://adguardy.com/api/tracker?force_transparent=true&id=test_google_certification&redirection_url=https://google.com
+https://app.adguardy.com/api/tracker?force_transparent=true&id=test_google_certification&redirection_url=https://google.com
 ```
+
+⚠️ **NOT:** API subdomain (app.adguardy.com) de sertifikaya dahil edilmeli!
 
 ### Adım 4: Non-Foreign Parameters Bildir
 

@@ -5,17 +5,18 @@
 
 ## 🎯 Temel Bilgiler
 
-**Domain:** adguardy.com  
-**Tracking URL:** `https://adguardy.com/api/tracker`  
+**Primary Domain:** adguardy.com  
+**App Subdomain:** app.adguardy.com (API endpoint)  
+**Tracking URL:** `https://app.adguardy.com/api/tracker`  
 **Sertifikasyon Durumu:** ✅ Tamamen Uyumlu  
-**Ortalama Redirect Süresi:** < 100ms
+**Ortalama Redirect Süresi:** < 200ms (ideally < 100ms)
 
 ---
 
 ## 📋 Google Ads'e Eklenecek Tracking Template
 
 ```
-https://adguardy.com/api/tracker?force_transparent=true&id={tracking_id}&redirection_url={lpurl}&campaign_id={campaignid}&gclid={gclid}&keyword={keyword}&device={device}&network={network}&adpos={adposition}
+https://app.adguardy.com/api/tracker?force_transparent=true&id={tracking_id}&redirection_url={lpurl}&campaign_id={campaignid}&gclid={gclid}&keyword={keyword}&device={device}&network={network}&adpos={adposition}
 ```
 
 ### Parametrelerin Değiştirilmesi Gereken Yerler
@@ -154,37 +155,39 @@ Bu parametreler **sadece internal logging** için kullanılır ve **final URL'e 
 
 ### Örnek 1: Basit
 ```
-https://adguardy.com/api/tracker?force_transparent=true&id=test001&redirection_url=https://example.com/
+https://app.adguardy.com/api/tracker?force_transparent=true&id=test001&redirection_url=https://example.com/
 ```
 
 ### Örnek 2: Tüm Parametrelerle
 ```
-https://adguardy.com/api/tracker?force_transparent=true&id=usr_abc123&redirection_url=https://example.com/products/shoes&campaign_id=9876543210&gclid=TeSter-click-id&keyword=running+shoes&device=mobile&network=search&adpos=1t2
+https://app.adguardy.com/api/tracker?force_transparent=true&id=usr_abc123&redirection_url=https://example.com/products/shoes&campaign_id=9876543210&gclid=TeSter-click-id&keyword=running+shoes&device=mobile&network=search&adpos=1t2
 ```
 
 ### Örnek 3: URL-Encoded Redirection
 ```
-https://adguardy.com/api/tracker?force_transparent=true&id=test001&redirection_url=https%3A%2F%2Fexample.com%2Fpage%3Futm_source%3Dgoogle
+https://app.adguardy.com/api/tracker?force_transparent=true&id=test001&redirection_url=https%3A%2F%2Fexample.com%2Fpage%3Futm_source%3Dgoogle
 ```
 
 ---
 
 ## 🧪 Test Etme
 
+⚠️ **ÖNEMLİ:** API `https://app.adguardy.com` subdomain'i altında çalışır!
+
 ### Manuel Test
 ```bash
-# Basit test
-curl -I "https://adguardy.com/api/tracker?force_transparent=true&id=test&redirection_url=https://google.com"
+# Basit test (DOĞRU URL!)
+curl -I "https://app.adguardy.com/api/tracker?force_transparent=true&id=test&redirection_url=https://google.com"
 
 # Response: 302 Found
-# Location: https://google.com
+# Location: https://google.com (DEĞİŞMEMİŞ!)
 ```
 
 ### Response Time Test
 ```bash
-time curl -I "https://adguardy.com/api/tracker?force_transparent=true&id=test&redirection_url=https://google.com"
+time curl -I "https://app.adguardy.com/api/tracker?force_transparent=true&id=test&redirection_url=https://google.com"
 
-# Beklenen: < 100ms
+# Beklenen: < 200ms (ideally < 100ms)
 ```
 
 ---
