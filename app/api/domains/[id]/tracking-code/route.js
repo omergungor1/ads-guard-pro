@@ -30,7 +30,7 @@ export async function GET(request, { params }) {
         // Tracking script kodu
         const trackingScript = `<!-- AdsGuardPro Tracking Script -->
 <script>
-  window.AGP_TRACKING_ID = '${domain.tracking_id}';
+  window.ag_tracking_id = '${domain.tracking_id}';
   window.AGP_API_URL = '${appUrl}';
 </script>
 <script src="${appUrl}/js/tracker.js" async></script>

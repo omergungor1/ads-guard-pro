@@ -8,7 +8,7 @@
     // Konfigürasyon
     const CONFIG = {
         apiUrl: window.AGP_API_URL || (window.location.protocol + '//' + window.location.host),
-        trackingId: window.AGP_TRACKING_ID || null,
+        trackingId: window.ag_tracking_id || null,
         debug: window.AGP_DEBUG || false
     };
 
@@ -194,9 +194,8 @@
         try {
             log('Tracking başlatılıyor...');
 
-            // Tracking ID kontrolü
-            const trackingId = getCookie('cc_tracking_id') ||
-                getCookie('agp_tracking_id') ||
+            // Tracking ID kontrolü (cookie'den veya config'den)
+            const trackingId = getCookie('ag_tracking_id') ||
                 CONFIG.trackingId;
 
             if (!trackingId) {
@@ -205,7 +204,8 @@
             }
 
             // Cookie'lerden ad click bilgisi al
-            const adClickId = getCookie('cc_ad_click_id') || getCookie('agp_ad_click_id');
+            const adClickId = getCookie('ag_ad_click_id') ||
+                getCookie('ag_click_id');
 
             log('Tracking başlatılıyor...', {
                 trackingId: trackingId.substring(0, 10) + '...',
@@ -215,7 +215,7 @@
             // ═══════════════════════════════════════════════════════════
             // FingerprintJS Yükle ve Fingerprint Oluştur
             // ═══════════════════════════════════════════════════════════
-            let fingerprintId = getCookie('cc_fingerprint') || getCookie('agp_fingerprint');
+            let fingerprintId = getCookie('ag_fingerprint');
             let fingerprintData = null;
 
             if (!fingerprintId) {
@@ -230,7 +230,7 @@
                     log('Client fingerprint oluşturuldu:', fingerprintId.substring(0, 15) + '...');
                 } catch (error) {
                     log('FingerprintJS hatası:', error);
-                    // Fallback: Basit fingerprint
+                    // Fallback: Basit fingerprint (server tarafında da oluşturulur)
                     fingerprintId = `fp_${Date.now()}_${Math.random().toString(36).substring(7)}`;
                 }
             } else {

@@ -199,7 +199,7 @@ https://yourdomain.com/api/tracker?id={tracking_id}&campaign_id={campaignid}&gcl
 <!-- Müşteri sitesine ekle -->
 <script>
   window.AGP_API_URL = 'https://yourdomain.com';
-  window.AGP_TRACKING_ID = 'abc123xyz';
+  window.ag_tracking_id = 'abc123xyz';
   window.AGP_DEBUG = false; // Development'ta true
 </script>
 <script src="https://yourdomain.com/js/tracker.js"></script>
