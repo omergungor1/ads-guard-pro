@@ -1,26 +1,14 @@
 // app/api/tracker/route.js
 // Google Ads Tracking Template Endpoint - Google Certified Click Tracker
 // Compliant with Google's Third-Party Click Tracking Guidelines
-// ✅ Ultra-fast redirect (< 50ms) - Edge Runtime
+// ✅ Fast redirect (< 100ms)
 // ✅ Background processing for heavy operations
 // ✅ Transparent redirection parameter
 // ✅ URL validation
 // ✅ Domain verification
-// ✅ No caching - Every request is unique
 
 import { NextResponse } from 'next/server';
-
-// Edge Runtime - Runs on Vercel Edge Network (CDN level)
-// This makes the redirect ultra-fast by executing at the edge closest to the user
-export const runtime = 'edge';
-
-// Generate unique ID using Web Crypto API (Edge-native, faster than nanoid)
-function generateId(length = 32) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    const randomValues = new Uint8Array(length);
-    crypto.getRandomValues(randomValues);
-    return Array.from(randomValues, byte => chars[byte % chars.length]).join('');
-}
+import { nanoid } from 'nanoid';
 
 export async function GET(request) {
     const startTime = Date.now();
@@ -125,21 +113,13 @@ export async function GET(request) {
         // ═══════════════════════════════════════════════════════════
         // STEP 3: GENERATE TRACKING IDs (Client-side cookies)
         // ═══════════════════════════════════════════════════════════
-        // Using Web Crypto API for Edge-native ID generation (faster than nanoid)
-        const clickId = generateId(32);
-        const fingerprintId = `fp_${Date.now()}_${generateId(16)}`;
+        const clickId = nanoid(32);
+        const fingerprintId = `fp_${Date.now()}_${nanoid(16)}`;
 
         // ═══════════════════════════════════════════════════════════
-        // STEP 4: ULTRA-FAST REDIRECT WITH COOKIES (Edge Runtime)
+        // STEP 4: FAST REDIRECT WITH COOKIES (Google Requirement: Fast Response)
         // ═══════════════════════════════════════════════════════════
         const response = NextResponse.redirect(finalRedirectUrl, { status: 302 });
-
-        // CRITICAL: No caching - Every request is unique with different parameters
-        // This ensures Google tracking parameters are always correctly processed
-        response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        response.headers.set('Pragma', 'no-cache');
-        response.headers.set('Expires', '0');
-        response.headers.set('Surrogate-Control', 'no-store');
 
         // Set tracking cookies for site tracking script
         response.cookies.set('ag_click_id', clickId, {
@@ -222,12 +202,6 @@ export async function GET(request) {
         // Always redirect user even on error (Google requirement: no dead ends)
         const { searchParams } = new URL(request.url);
         const redirectionUrl = searchParams.get('redirection_url') || 'https://google.com';
-        const errorResponse = NextResponse.redirect(redirectionUrl, { status: 302 });
-
-        // No caching on error responses too
-        errorResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-        errorResponse.headers.set('Pragma', 'no-cache');
-
-        return errorResponse;
+        return NextResponse.redirect(redirectionUrl, { status: 302 });
     }
 }
