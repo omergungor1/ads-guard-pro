@@ -37,16 +37,8 @@ export default function DocsPage() {
               <p className="text-blue-600">info@adguardy.com</p>
             </div>
             <div>
-              <p className="font-medium text-gray-700">Support</p>
-              <p className="text-blue-600">support@adguardy.com</p>
-            </div>
-            <div>
-              <p className="font-medium text-gray-700">Privacy</p>
-              <p className="text-blue-600">privacy@adguardy.com</p>
-            </div>
-            <div>
-              <p className="font-medium text-gray-700">Legal</p>
-              <p className="text-blue-600">legal@adguardy.com</p>
+              <p className="font-medium text-gray-700">Phone</p>
+              <p className="text-blue-600"><a href="tel:+905428212205" className="hover:underline">+90 542 821 22 05</a></p>
             </div>
           </div>
           <div className="mt-4 pt-4 border-t">
@@ -59,7 +51,7 @@ export default function DocsPage() {
           </div>
           <div className="mt-4 pt-4 border-t">
             <p className="font-medium text-gray-700 mb-2">Company</p>
-            <p className="text-sm text-gray-600">AdGuardy - Istanbul, Turkey</p>
+            <p className="text-sm text-gray-600">AdGuardy - Bursa, Turkey</p>
           </div>
         </section>
 
@@ -84,7 +76,7 @@ export default function DocsPage() {
             </div>
           </div>
           <p className="text-sm text-gray-600 mt-4">
-            <strong>Note:</strong> All subdomains under <code>adguardy.com</code> use the same certified tracking infrastructure and comply with Google's transparency guidelines.
+            <strong>Note:</strong> All subdomains under <code>adguardy.com</code> use the same certified tracking infrastructure.
           </p>
         </section>
 
@@ -454,7 +446,7 @@ export default function DocsPage() {
             <div>
               <h3 className="font-semibold mb-2">7. Fast Redirect Performance ✅</h3>
               <ul className="list-disc list-inside space-y-1 text-gray-700 ml-4 text-sm">
-                <li>Average redirect time: &lt; 200ms (ideally &lt; 100ms)</li>
+                <li>Average redirect time: &lt; 200ms</li>
                 <li>Non-blocking architecture</li>
                 <li>Heavy operations run in background</li>
                 <li>User redirected immediately after validation</li>
@@ -696,28 +688,14 @@ strict-transport-security: max-age=63072000`}
           <h2 className="text-2xl font-semibold mb-4">📞 Support & Contact</h2>
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <p className="font-medium text-gray-700">Technical Support</p>
-              <p className="text-blue-600">support@adguardy.com</p>
-              <p className="text-sm text-gray-600">Response Time: &lt; 24 hours</p>
-            </div>
-            <div>
               <p className="font-medium text-gray-700">Certification Contact</p>
               <p className="text-blue-600">info@adguardy.com</p>
               <p className="text-sm text-gray-600">For certification inquiries, compliance questions</p>
             </div>
             <div>
-              <p className="font-medium text-gray-700">Privacy Inquiries</p>
-              <p className="text-blue-600">privacy@adguardy.com</p>
-              <p className="text-sm text-gray-600">
-                <a href="https://www.adguardy.com/privacy-policy" target="_blank" rel="noopener noreferrer" className="hover:underline">Privacy Policy</a>
-              </p>
-            </div>
-            <div>
-              <p className="font-medium text-gray-700">Legal Inquiries</p>
-              <p className="text-blue-600">legal@adguardy.com</p>
-              <p className="text-sm text-gray-600">
-                <a href="https://www.adguardy.com/terms-of-service" target="_blank" rel="noopener noreferrer" className="hover:underline">Terms of Service</a>
-              </p>
+              <p className="font-medium text-gray-700">Phone</p>
+              <p className="text-blue-600"><a href="tel:+905428212205" className="hover:underline">+90 542 821 22 05</a></p>
+              <p className="text-sm text-gray-600">Available for certification inquiries</p>
             </div>
           </div>
         </section>
@@ -727,7 +705,7 @@ strict-transport-security: max-age=63072000`}
           <h2 className="text-2xl font-semibold mb-4">📝 Change Management Policy</h2>
           <p className="text-gray-700 mb-4">We commit to:</p>
           <ol className="list-decimal list-inside space-y-2 text-gray-700 ml-4">
-            <li>Notifying Google <strong>at least 30 days in advance</strong> of any changes to:
+            <li>Notifying Google <strong>at least 15 days in advance</strong> of any changes to:
               <ul className="list-disc list-inside ml-6 mt-1 text-sm">
                 <li>Transparency parameter names</li>
                 <li>Non-foreign parameters</li>
